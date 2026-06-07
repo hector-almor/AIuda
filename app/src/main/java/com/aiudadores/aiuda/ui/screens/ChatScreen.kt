@@ -134,7 +134,7 @@ fun PrincipalScreen() {
 
                     IconButton(onClick = {
                         val intent = Intent(Intent.ACTION_DIAL).apply {
-                            data = Uri.parse("tel:911")
+                            data = Uri.parse("tel:8009112000")
                         }
                         context.startActivity(intent)
                     }) {
