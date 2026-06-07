@@ -10,15 +10,18 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -32,6 +35,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,10 +49,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aiudadores.aiuda.ChatViewModel
 import kotlinx.coroutines.launch
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 @Composable
-fun PrincipalScreen() {
+fun PrincipalScreen(viewModel: ChatViewModel = viewModel()) {
     var mensaje by remember { mutableStateOf("") }
 
     val drawerState = rememberDrawerState(
@@ -56,11 +63,22 @@ fun PrincipalScreen() {
 
     val scope = rememberCoroutineScope()
 
+    /*
     val mensajes = listOf(
         Pair("Hola, te AIudo?", false),
         Pair("Me chento malito wa waaaa", true),
         Pair("No este tite", false)
-    )
+    )*/
+    val uiState by viewModel.uiState.collectAsState()
+
+
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(uiState.messages.size) {
+        if(uiState.messages.isNotEmpty()){
+            listState.animateScrollToItem(uiState.messages.size-1)
+        }
+    }
 
     val historialChats = listOf(
         "Chat de hoy",
@@ -165,18 +183,37 @@ fun PrincipalScreen() {
 
                 HorizontalDivider()
 
-                LazyColumn(
+                LazyColumn(state = listState,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(mensajes) { (texto, esUsuario) ->
+                    items(uiState.messages) { msg ->
                         ChatBubble(
-                            texto = texto,
-                            esUsuario = esUsuario
+                            texto = msg.text,
+                            esUsuario = msg.isUser
                         )
+                    }
+
+                    if(uiState.isLoading){
+                        item{
+                            Row(modifier = Modifier.padding(8.dp)){
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                            }
+                        }
+                    }
+
+                    uiState.error?.let {
+                        error -> item{
+                        Text(
+                            text = error,
+                            color = Color.Red,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(8.dp)
+                        )
+                        }
                     }
                 }
 
@@ -200,7 +237,10 @@ fun PrincipalScreen() {
                     Spacer(modifier = Modifier.width(8.dp))
 
                     FloatingActionButton(
-                        onClick = { }
+                        onClick = {
+                            viewModel.sendMessage(mensaje)
+                            mensaje = ""
+                        }
                     ) {
                         Icon(
                             imageVector = Icons.Default.Send,
@@ -254,7 +294,7 @@ fun ChatBubble(
             Text(
                 text = texto,
                 color =
-                    if (esUsuario)
+                if (esUsuario)
                         Color.White
                     else
                         Color(0xFF111827),
