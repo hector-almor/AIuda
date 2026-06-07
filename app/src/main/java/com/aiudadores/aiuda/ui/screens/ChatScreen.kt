@@ -1,36 +1,28 @@
 package com.aiudadores.aiuda.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.NavigationDrawerItem
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
@@ -44,83 +36,60 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.aiudadores.aiuda.ChatViewModel
-import kotlinx.coroutines.launch
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.aiudadores.aiuda.ui.components.ChatBubble
+import com.aiudadores.aiuda.ui.components.ChatInputBar
+import com.aiudadores.aiuda.ui.theme.AzulPrimario
+import com.aiudadores.aiuda.ui.theme.FondoPrincipal
+import com.aiudadores.aiuda.ui.theme.RojoError
+import com.aiudadores.aiuda.ui.theme.TextoPrincipal
+import com.aiudadores.aiuda.ui.theme.TextoSecundario
+import com.aiudadores.aiuda.ui.viewmodel.ChatViewModel
+import com.aiudadores.aiuda.ui.viewmodel.ChatViewModelFactory
+import kotlinx.coroutines.launch
 
 @Composable
-fun PrincipalScreen(viewModel: ChatViewModel = viewModel()) {
+fun PrincipalScreen() {
+    val context = LocalContext.current
+    val viewModel: ChatViewModel = viewModel(factory = ChatViewModelFactory(context))
+
     var mensaje by remember { mutableStateOf("") }
-
-    val drawerState = rememberDrawerState(
-        initialValue = DrawerValue.Closed
-    )
-
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-
-    /*
-    val mensajes = listOf(
-        Pair("Hola, te AIudo?", false),
-        Pair("Me chento malito wa waaaa", true),
-        Pair("No este tite", false)
-    )*/
     val uiState by viewModel.uiState.collectAsState()
-
-
     val listState = rememberLazyListState()
 
-    LaunchedEffect(uiState.messages.size) {
-        if(uiState.messages.isNotEmpty()){
-            listState.animateScrollToItem(uiState.messages.size-1)
+    LaunchedEffect(uiState.currentMessages.size) {
+        if (uiState.currentMessages.isNotEmpty()) {
+            listState.animateScrollToItem(uiState.currentMessages.size - 1)
         }
     }
-
-    val historialChats = listOf(
-        "Chat de hoy",
-        "Chat de ayer",
-        "Se acavoid digital circus y no se que hacer ayuda",
-    )
 
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            ModalDrawerSheet(
-                modifier = Modifier
-                    .width(280.dp)
-                    .fillMaxHeight()
-            ) {
-                Text(
-                    text = "Historial de chats",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 22.sp,
-                    modifier = Modifier.padding(16.dp),
-                    color = Color(0xFF111827)
-                )
-
-                HorizontalDivider()
-
-                Spacer(modifier = Modifier.padding(4.dp))
-
-                historialChats.forEach { chat ->
-                    NavigationDrawerItem(
-                        label = {
-                            Text(text = chat)
-                        },
-                        selected = false,
-                        onClick = {
-                            scope.launch {
-                                drawerState.close()
-                            }
-                        },
-                        modifier = Modifier.padding(horizontal = 8.dp)
-                    )
+            ChatHistoryDrawer(
+                sessions = uiState.sessions,
+                currentSessionId = uiState.currentSession?.id,
+                onNewChat = {
+                    viewModel.createNewSession()
+                    scope.launch { drawerState.close() }
+                },
+                onSelectSession = { session ->
+                    viewModel.selectSession(session)
+                    scope.launch { drawerState.close() }
+                },
+                onDeleteSession = { sessionId ->
+                    viewModel.deleteSession(sessionId)
+                },
+                onRenameSession = { sessionId, newName ->
+                    viewModel.renameSession(sessionId, newName)
                 }
-            }
+            )
         }
     ) {
         Scaffold { padding ->
@@ -128,7 +97,7 @@ fun PrincipalScreen(viewModel: ChatViewModel = viewModel()) {
                 modifier = Modifier
                     .padding(padding)
                     .fillMaxSize()
-                    .background(Color(0xFFF5F7FB))
+                    .background(FondoPrincipal)
             ) {
                 Row(
                     modifier = Modifier
@@ -136,170 +105,93 @@ fun PrincipalScreen(viewModel: ChatViewModel = viewModel()) {
                         .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(
-                        onClick = {
-                            scope.launch {
-                                drawerState.open()
-                            }
-                        }
-                    ) {
+                    IconButton(onClick = { scope.launch { drawerState.open() } }) {
                         Icon(
                             imageVector = Icons.Default.Menu,
                             contentDescription = "Abrir historial",
-                            tint = Color(0xFF111827)
+                            tint = TextoPrincipal
                         )
                     }
 
-                    Column(
-                        modifier = Modifier.padding(start = 8.dp)
-                    ) {
-                        Text(
-                            text = "AI_Uda",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 24.sp,
-                            color = Color(0xFF111827)
-                        )
+                    Spacer(modifier = androidx.compose.ui.Modifier.size(8.dp))
 
+                    Column(modifier = Modifier.padding(start = 8.dp)) {
+                        Text(
+                            text = uiState.currentSession?.name ?: "AI_Uda",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp,
+                            color = TextoPrincipal
+                        )
                         Text(
                             text = "Siempre listo para AIudarte!",
                             fontWeight = FontWeight.Medium,
-                            fontSize = 14.sp,
-                            color = Color(0xFF6B7280)
+                            fontSize = 13.sp,
+                            color = TextoSecundario
                         )
                     }
 
                     Spacer(modifier = Modifier.weight(1f))
 
-                    IconButton(
-                        onClick = { }
-                    ) {
+                    IconButton(onClick = {
+                        val intent = Intent(Intent.ACTION_DIAL).apply {
+                            data = Uri.parse("tel:911")
+                        }
+                        context.startActivity(intent)
+                    }) {
                         Icon(
                             imageVector = Icons.Default.Call,
                             contentDescription = "Llamar",
-                            tint = Color(0xFF4F46E5)
+                            tint = AzulPrimario
                         )
                     }
                 }
 
                 HorizontalDivider()
 
-                LazyColumn(state = listState,
+                LazyColumn(
+                    state = listState,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(uiState.messages) { msg ->
-                        ChatBubble(
-                            texto = msg.text,
-                            esUsuario = msg.isUser
-                        )
+                    items(uiState.currentMessages) { msg ->
+                        ChatBubble(texto = msg.text, esUsuario = msg.isUser)
                     }
 
-                    if(uiState.isLoading){
-                        item{
-                            Row(modifier = Modifier.padding(8.dp)){
-                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    if (uiState.isLoading) {
+                        item {
+                            Row(modifier = Modifier.padding(8.dp)) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    color = AzulPrimario
+                                )
                             }
                         }
                     }
 
-                    uiState.error?.let {
-                        error -> item{
-                        Text(
-                            text = error,
-                            color = Color.Red,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(8.dp)
-                        )
+                    uiState.error?.let { error ->
+                        item {
+                            Text(
+                                text = error,
+                                color = RojoError,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(8.dp)
+                            )
                         }
                     }
                 }
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFFF5F7FB))
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = mensaje,
-                        onValueChange = { mensaje = it },
-                        modifier = Modifier.weight(1f),
-                        placeholder = {
-                            Text("Escribe un mensaje...")
-                        },
-                        shape = RoundedCornerShape(24.dp)
-                    )
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    FloatingActionButton(
-                        onClick = {
-                            viewModel.sendMessage(mensaje)
-                            mensaje = ""
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Send,
-                            contentDescription = "Enviar"
-                        )
+                ChatInputBar(
+                    value = mensaje,
+                    onValueChange = { mensaje = it },
+                    onSend = {
+                        viewModel.sendMessage(mensaje)
+                        mensaje = ""
                     }
-                }
+                )
             }
-        }
-    }
-}
-
-@Composable
-fun ChatBubble(
-    texto: String,
-    esUsuario: Boolean
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement =
-            if (esUsuario) Arrangement.End
-            else Arrangement.Start
-    ) {
-        Box(
-            modifier = Modifier
-                .widthIn(max = 280.dp)
-                .shadow(
-                    elevation = 2.dp,
-                    shape = RoundedCornerShape(
-                        topStart = 18.dp,
-                        topEnd = 18.dp,
-                        bottomStart = if (esUsuario) 18.dp else 4.dp,
-                        bottomEnd = if (esUsuario) 4.dp else 18.dp
-                    )
-                )
-                .background(
-                    color =
-                        if (esUsuario)
-                            Color(0xFF4F46E5)
-                        else
-                            Color.White,
-                    shape = RoundedCornerShape(
-                        topStart = 18.dp,
-                        topEnd = 18.dp,
-                        bottomStart = if (esUsuario) 18.dp else 4.dp,
-                        bottomEnd = if (esUsuario) 4.dp else 18.dp
-                    )
-                )
-                .padding(horizontal = 14.dp, vertical = 10.dp)
-        ) {
-            Text(
-                text = texto,
-                color =
-                if (esUsuario)
-                        Color.White
-                    else
-                        Color(0xFF111827),
-                fontSize = 15.sp
-            )
         }
     }
 }
