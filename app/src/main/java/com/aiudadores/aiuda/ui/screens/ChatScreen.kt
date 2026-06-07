@@ -1,4 +1,4 @@
-package com.miro8475.ai_uda.ui.screens.ChatScreen
+package com.aiudadores.aiuda.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
